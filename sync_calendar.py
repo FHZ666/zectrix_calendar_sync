@@ -189,9 +189,10 @@ class CalendarSyncer:
 
                 for calendar in calendars:
                     print(f"  搜索日历: {calendar.url}")
-                    events_found = calendar.date_search(
+                    events_found = calendar.search(
                         start=start_search,
-                        end=end_search
+                        end=end_search,
+                        event=True
                     )
                     for event in events_found:
                         parsed_list = self.parse_caldav_event(event)

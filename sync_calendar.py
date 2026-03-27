@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import requests
 import datetime
 import json
@@ -7,16 +8,16 @@ import time
 from typing import List, Dict
 from icalendar import Calendar
 
-# 配置信息
-API_BASE = "https://cloud.zectrix.com/open/v1"
-API_KEY = "your_api_key"
-DEVICE_ID = "your_device_id"
-EXPIRE_HOURS = 1  # 超过1小时删除
+# 配置信息 - 从环境变量读取
+API_BASE = os.getenv("API_BASE", "https://cloud.zectrix.com/open/v1")
+API_KEY = os.getenv("API_KEY", "")
+DEVICE_ID = os.getenv("DEVICE_ID", "")
+EXPIRE_HOURS = int(os.getenv("EXPIRE_HOURS", "1"))  # 超过N小时删除
 
-# CalDAV配置 - 需要用户填写
-CALDAV_URL = "https://caldav.mxhichina.com/dav/your-email@example.com/"
-CALDAV_USER = "your-email@example.com"  # 你的CalDAV用户名
-CALDAV_PASS = "your_mail_password"  # 你的CalDAV密码/授权码
+# CalDAV配置 - 从环境变量读取
+CALDAV_URL = os.getenv("CALDAV_URL", "https://caldav.mxhichina.com/dav/your-email@example.com/")
+CALDAV_USER = os.getenv("CALDAV_USER", "")  # 你的CalDAV用户名
+CALDAV_PASS = os.getenv("CALDAV_PASS", "")  # 你的CalDAV密码/授权码
 
 
 class CalendarSyncer:

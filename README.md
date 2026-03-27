@@ -32,20 +32,71 @@ pip install caldav icalendar requests
 
 ## 配置
 
-编辑 `sync_calendar.py` 头部配置:
+所有配置通过**环境变量**注入，支持两种方式：
 
-```python
+### 方式一：临时设置环境变量运行
+
+```bash
 # Zectrix API 配置
-API_BASE = "https://cloud.zectrix.com/open/v1"
-API_KEY = "your-api-key"          # 你的 API Key
-DEVICE_ID = "your-device-id"      # 你的设备 ID
-EXPIRE_HOURS = 1                  # 过期多久后删除，单位小时
+export API_BASE="https://cloud.zectrix.com/open/v1"
+export API_KEY="your-api-key"          # 你的 API Key
+export DEVICE_ID="your-device-id"      # 你的设备 ID
+export EXPIRE_HOURS="1"                # 过期多久后删除，单位小时
 
-#  CalDAV 配置
-CALDAV_URL = "https://caldav.mxhichina.com/dav/your-email@example.com/"
-CALDAV_USER = "your-email@example.com"  # 邮箱用户名
-CALDAV_PASS = "your-password"           # 邮箱密码/授权码
+# CalDAV 配置
+export CALDAV_URL="https://caldav.mxhichina.com/dav/your-email@example.com/"
+export CALDAV_USER="your-email@example.com"  # 邮箱用户名
+export CALDAV_PASS="your-password"           # 邮箱密码/授权码
+
+python sync_calendar.py
 ```
+
+### 方式二：通过 `.env` 文件配置（推荐）
+
+创建 `.env` 文件：
+
+```env
+# Zectrix API 配置
+API_BASE=https://cloud.zectrix.com/open/v1
+API_KEY=your-api-key
+DEVICE_ID=your-device-id
+EXPIRE_HOURS=1
+
+# CalDAV 配置
+CALDAV_URL=https://caldav.mxhichina.com/dav/your-email@example.com/
+CALDAV_USER=your-email@example.com
+CALDAV_PASS=your-password
+```
+
+然后使用 python-dotenv 加载：
+
+```bash
+pip install python-dotenv
+```
+
+在运行前加载：
+
+```bash
+python -c "import dotenv; dotenv.load_dotenv(); import sync_calendar"
+```
+
+或者如果你使用 bash：
+
+```bash
+export $(grep -v '^#' .env | xargs) && python sync_calendar.py
+```
+
+### 环境变量说明
+
+| 环境变量 | 必填 | 默认值 | 说明 |
+|---------|------|--------|------|
+| `API_BASE` | 否 | `https://cloud.zectrix.com/open/v1` | Zectrix API 地址 |
+| `API_KEY` | 是 | - | 你的 API Key，从 Zectrix 云端获取 |
+| `DEVICE_ID` | 是 | - | 你的设备 ID |
+| `EXPIRE_HOURS` | 否 | `1` | 过期多久（小时）后删除过期日程 |
+| `CALDAV_URL` | 否 | 阿里云邮箱默认地址 | CalDAV 服务器地址 |
+| `CALDAV_USER` | 是 | - | CalDAV 用户名（通常是邮箱地址） |
+| `CALDAV_PASS` | 是 | - | CalDAV 密码/授权码 |
 
 ## 运行
 

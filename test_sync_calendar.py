@@ -111,6 +111,7 @@ class TestFindExistingTodoByUid:
             "dueTime": "10:00",
         }
         syncer.existing_todos = [todo]
+        syncer._uid_map = {"uid123": todo}
         result = syncer.find_existing_todo_by_uid("uid123")
         assert result is todo
 
@@ -163,6 +164,7 @@ class TestSyncNewEvents:
     def setup_method(self):
         self.syncer = CalendarSyncer()
         self.syncer.existing_todos = []
+        self.syncer._uid_map = {}
 
     def test_creates_new_todo_when_uid_not_exists(self, mocker):
         """当UID不存在时创建新待办"""
@@ -195,7 +197,7 @@ class TestSyncNewEvents:
     def test_updates_todo_when_content_changed(self, mocker):
         """内容变化时更新已有待办"""
         mock_update = mocker.patch.object(self.syncer, 'update_todo', return_value=True)
-        self.syncer.existing_todos = [{
+        todo = {
             "id": 123,
             "uid": "existing-uid",
             "title": "[日历] 旧标题",
@@ -203,7 +205,9 @@ class TestSyncNewEvents:
             "dueDate": "2024-03-27",
             "dueTime": "10:00",
             "status": 0,
-        }]
+        }
+        self.syncer.existing_todos = [todo]
+        self.syncer._uid_map = {"existing-uid": todo}
         events = [{
             "uid": "existing-uid",
             "title": "新标题",
@@ -222,7 +226,7 @@ class TestSyncNewEvents:
     def test_no_update_when_content_unchanged(self, mocker):
         """内容不变不更新"""
         mock_update = mocker.patch.object(self.syncer, 'update_todo', return_value=True)
-        self.syncer.existing_todos = [{
+        todo = {
             "id": 123,
             "uid": "existing-uid",
             "title": "[日历] 测试会议",
@@ -230,7 +234,9 @@ class TestSyncNewEvents:
             "dueDate": "2024-03-27",
             "dueTime": "10:00",
             "status": 0,
-        }]
+        }
+        self.syncer.existing_todos = [todo]
+        self.syncer._uid_map = {"existing-uid": todo}
         events = [{
             "uid": "existing-uid",
             "title": "测试会议",

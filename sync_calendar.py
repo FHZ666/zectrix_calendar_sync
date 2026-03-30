@@ -193,11 +193,12 @@ class CalendarSyncer:
 
                 for calendar in calendars:
                     print(f"  搜索日历: {calendar.url}")
-                    events_found = calendar.search(
+                    print(f"  搜索时间范围: {start_search.strftime('%Y-%m-%d %H:%M')} ~ {end_search.strftime('%Y-%m-%d %H:%M')}")
+                    events_found = calendar.date_search(
                         start=start_search,
-                        end=end_search,
-                        event=True
+                        end=end_search
                     )
+                    print(f"  CalDAV返回 {len(events_found)} 个事件")
                     for event in events_found:
                         parsed_list = self.parse_caldav_event(event)
                         events.extend(parsed_list)

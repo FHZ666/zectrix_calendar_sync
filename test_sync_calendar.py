@@ -507,6 +507,88 @@ class TestCalendarSyncerInit:
         assert syncer.existing_todos == []
         assert syncer.max_retries == 3
 
+    def test_init_dry_run_default_false(self):
+        """默认不启用dry_run"""
+        syncer = CalendarSyncer()
+        assert syncer.dry_run is False
+
+    def test_init_dry_run_enabled(self):
+        """启用dry_run"""
+        syncer = CalendarSyncer(dry_run=True)
+        assert syncer.dry_run is True
+
+
+class TestDryRun:
+    """测试 dry-run 模式：写操作被拦截，返回True"""
+
+    def setup_method(self):
+        self.syncer = CalendarSyncer(dry_run=True)
+
+    def test_complete_todo_dry_run(self, capsys):
+        """dry-run模式下complete_todo不调用API"""
+        result = self.syncer.complete_todo(123)
+        assert result is True
+        captured = capsys.readouterr()
+        assert "[DRY RUN]" in captured.out
+        assert "123" in captured.out
+
+    def test_delete_todo_dry_run(self, capsys):
+        """dry-run模式下delete_todo不调用API"""
+        result = self.syncer.delete_todo(456)
+        assert result is True
+        captured = capsys.readouterr()
+        assert "[DRY RUN]" in captured.out
+        assert "456" in captured.out
+
+    def test_create_todo_dry_run(self, capsys):
+        """dry-run模式下create_todo不调用API"""
+        result = self.syncer.create_todo("uid1", "测试会议", "2024-03-27", "10:00")
+        assert result is True
+        captured = capsys.readouterr()
+        assert "[DRY RUN]" in captured.out
+        assert "测试会议" in captured.out
+
+    def test_update_todo_dry_run(self, capsys):
+        """dry-run模式下update_todo不调用API"""
+        result = self.syncer.update_todo(789, "uid1", "新标题", "2024-03-27", "14:00")
+        assert result is True
+        captured = capsys.readouterr()
+        assert "[DRY RUN]" in captured.out
+        assert "789" in captured.out
+        assert "新标题" in captured.out
+
+    def test_dry_run_full_sync_flow(self, mocker, capsys):
+        """dry-run模式下完整同步流程不执行任何写入"""
+        self.syncer.existing_todos = []
+        self.syncer._uid_map = {}
+
+        events = [
+            {"uid": "uid-new", "title": "新会议", "dueDate": "2024-03-27", "dueTime": "10:00"},
+        ]
+
+        # 不mock任何requests方法，如果dry_run没生效会真的调API从而失败
+        self.syncer.sync_new_events(events)
+
+        captured = capsys.readouterr()
+        assert "[DRY RUN]" in captured.out
+
+    def test_normal_mode_actually_calls_api(self, mocker):
+        """非dry-run模式正常调用API（确保guard不影响正常流程）"""
+        syncer = CalendarSyncer(dry_run=False)
+        mock_response = Mock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.json.return_value = {"code": 0}
+        mock_put = mocker.patch('requests.put', return_value=mock_response)
+
+        def _mock_retry(func, *args, **kwargs):
+            return func()
+
+        with patch.object(syncer, 'retry_with_backoff', side_effect=_mock_retry):
+            result = syncer.complete_todo(123)
+
+        assert result is True
+        mock_put.assert_called_once()
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

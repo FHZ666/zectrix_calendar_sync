@@ -45,7 +45,7 @@ class CalendarSyncer:
         }
         self.existing_todos = []
         self._uid_map: Dict[str, Dict] = {}
-        self._todo_to_uid_map: Dict[int, str] = {}  # todo_id -> caldav_uid
+        self._todo_to_uid_map: Dict[int, Dict] = {}  # todo_id -> {uid, title, due_date, due_time}
         self._caldav_client = None
         self._caldav_calendar = None
         self.max_retries = 3
@@ -57,7 +57,16 @@ class CalendarSyncer:
             if os.path.exists(MAPPING_FILE):
                 with open(MAPPING_FILE, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    self._todo_to_uid_map = {int(k): v for k, v in data.get("todo_to_uid", {}).items()}
+                    # 兼容旧格式 (只存 uid 字符串) 和新格式 (存字典)
+                    loaded = data.get("todo_to_uid", {})
+                    for k, v in loaded.items():
+                        todo_id = int(k)
+                        if isinstance(v, str):
+                            # 旧格式：只有 uid
+                            self._todo_to_uid_map[todo_id] = {"uid": v}
+                        else:
+                            # 新格式：包含完整信息
+                            self._todo_to_uid_map[todo_id] = v
         except Exception as e:
             print(f"加载映射文件失败: {e}")
             self._todo_to_uid_map = {}
@@ -547,6 +556,21 @@ END:VCALENDAR
             print(f"删除日历事件失败: {e}")
             return False
 
+    def update_caldav_event(self, uid: str, title: str, due_date: str, due_time: str) -> Optional[str]:
+        """更新 CalDAV 日历中的事件（删除旧的，创建新的），返回新 UID"""
+        if self.dry_run:
+            print(f"  [DRY RUN] 会更新日历事件: {title} {due_date} {due_time}")
+            return f"dry-run-{uuid.uuid4()}"
+
+        # 先删除旧事件
+        if not self.delete_caldav_event(uid):
+            print(f"更新失败：无法删除旧事件 uid={uid}")
+            return None
+
+        # 创建新事件
+        new_uid = self.create_caldav_event(title, due_date, due_time)
+        return new_uid
+
     def sync_local_todos_to_calendar(self):
         """将本地待办同步到日历"""
         created_count = 0
@@ -558,6 +582,7 @@ END:VCALENDAR
 
         # 本地待办 ID 集合
         local_todo_ids = set()
+        need_save = False
 
         for todo in self._local_todos():
             todo_id = todo.get("id")
@@ -572,28 +597,47 @@ END:VCALENDAR
                 continue
 
             # 检查是否已经有映射
-            existing_uid = self._todo_to_uid_map.get(todo_id)
+            existing_mapping = self._todo_to_uid_map.get(todo_id)
 
-            if existing_uid:
+            if existing_mapping:
                 # 已有映射，检查是否需要更新
-                # 注意：当前实现暂不支持更新，因为需要更复杂的逻辑
-                pass
+                old_uid = existing_mapping.get("uid")
+                old_title = existing_mapping.get("title", "")
+                old_due_date = existing_mapping.get("due_date", "")
+                old_due_time = existing_mapping.get("due_time", "")
+
+                # 检查标题、日期或时间是否变化
+                if title != old_title or due_date != old_due_date or due_time != old_due_time:
+                    # 有变化，更新事件
+                    new_uid = self.update_caldav_event(old_uid, title, due_date, due_time)
+                    if new_uid:
+                        # 更新映射
+                        self._todo_to_uid_map[todo_id] = {
+                            "uid": new_uid,
+                            "title": title,
+                            "due_date": due_date,
+                            "due_time": due_time
+                        }
+                        updated_count += 1
+                        need_save = True
             else:
                 # 没有映射，创建新事件
                 uid = self.create_caldav_event(title, due_date, due_time)
                 if uid:
-                    self._todo_to_uid_map[todo_id] = uid
+                    self._todo_to_uid_map[todo_id] = {
+                        "uid": uid,
+                        "title": title,
+                        "due_date": due_date,
+                        "due_time": due_time
+                    }
                     created_count += 1
+                    need_save = True
 
         # 保存映射
-        if created_count > 0 and not self.dry_run:
+        if need_save and not self.dry_run:
             self._save_mapping()
 
-        # 检查是否有已删除的待办（映射中存在但待办列表中不存在）
-        # 这需要在获取所有待办（包括已完成的）时才能检测
-        # 当前实现暂不支持
-
-        print(f"本地待办同步到日历完成，新增 {created_count} 个事件")
+        print(f"本地待办同步到日历完成，新增 {created_count}，更新 {updated_count} 个事件")
 
     def run(self):
         """运行完整同步流程"""
